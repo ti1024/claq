@@ -1,0 +1,8 @@
+# Files in any directory
+*.aux
+*.log
+*.pdf
+
+# Files in this directory
+/cabal-dev
+/dist

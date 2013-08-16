@@ -1,0 +1,14 @@
+# Default to automatic detection
+* text=auto
+
+# Files in any directory
+*.cabal text
+*.hs text
+*.tex text
+*.txt text
+.gitattributes text
+.gitignore text
+
+# Files in this directory
+/LICENSE text
+/.project text

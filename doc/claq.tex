@@ -1,0 +1,222 @@
+\documentclass[letterpaper,11pt]{article}
+\usepackage[scale=0.8]{geometry}
+\usepackage{amsmath}
+\usepackage{txfonts}
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+\usepackage{mathtools}
+
+\DeclarePairedDelimiter{\ket}{\lvert}{\rangle}
+
+\newcommand{\param}[1]{\ensuremath{\langle\text{\textit{#1}}\rangle}}
+
+\title{Claq: Classical-to-quantum circuit synthesizer}
+\author{Tsuyoshi Ito \\
+  NEC Laboratories America, Inc.}
+\date{}
+
+\begin{document}
+\maketitle
+
+Claq is a tool which converts a classical combinational circuit to a quantum circuit.
+
+\section{Usage}
+
+Claq is invoked by the following command line:
+\begin{quote}
+\texttt{claq} [\param{option}\ldots] \param{input}\ldots
+\end{quote}
+
+Each \param{input} is the name of a file containing the description
+of a classical combinational circuit in the format described
+in Section~\ref{section:input-spec}.
+For each \param{filename} on the command line,
+Claq produces its report to the standard output.
+All \param{option}s apply to all \param{input}s on the command line,
+and the relative order of \param{option}s and \param{input}s is irrelevant.
+
+Valid \param{option}s are as follows.
+\begin{itemize}
+\item
+  \texttt{-{-}report=}\param{report-type}:
+  This option specifies the type of the report that Claq produces.
+  \param{report-type} is one of the following.
+  \begin{itemize}
+  \item
+    \texttt{circuit} (default):
+    The .QC circuit which consists of
+    NOT, CNOT, and Toffoli gates.
+    CNOT and Toffoli gates may have positive and negative controls.
+  \item
+    \texttt{circuitstd}:
+    The .QC circuit which consists of
+    gates in the standard gate set (Clifford and T gates).
+  \item
+    \texttt{raw}:
+    The circuit in the internal format
+    (primarily for debugging).
+  \end{itemize}
+\item
+  \texttt{-s}:
+  A shorthand for \texttt{-{-}report=circuitstd}.
+\item
+  \texttt{-n}, \texttt{-{-}noncoherent}:
+  By default, Claq produces a quantum circuit
+  which implements the specified classical function~$f$ in a coherent manner:
+  $\ket{x}\ket{y}\ket{0}\mapsto\ket{x}\ket{y\oplus f(x)}\ket{0}$.
+  When~\texttt{-n} is specified,
+  Claq produces a quantum circuit
+  which implements~$f$ in a noncoherent manner:
+  $\ket{x}\ket{y}\ket{0}\mapsto\ket{x}\ket{y\oplus f(x)}\ket{\varphi_x}$,
+  where~$\ket{\varphi_x}$ is some quantum state depending on~$x$.
+  Specify~\texttt{-n} when you know that the noncoherent version is sufficient
+  and want a smaller circuit.
+\end{itemize}
+
+\section{Input specification} \label{section:input-spec}
+
+Claq reads classical circuits from files specified on the command line.
+Each file contains one classical circuit, whose grammar will be specified in this section.
+
+An example of a simple classical circuit is:
+\begin{quote}
+\begin{verbatim}
+-- 2-bit adder with carry
+.inputs a0, a1, b0, b1, c0;
+.outputs s0, s1, s2;
+s0 = a0 ^ b0 ^ c0;
+c1 = a0 & (b0 | c0) | b0 & c0;
+s1 = a1 ^ b1 ^ c1;
+s2 = a1 & (b1 | c1) | b1 & c1;
+\end{verbatim}
+\end{quote}
+
+\subsection{Lexical structure}
+
+The lexical structure of an input file
+is similar to that of Haskell 2010 with the notable exception
+that identifiers can start or contain a period (``\verb|.|'').
+
+A comment either begins with two consecutive dashes (``\verb|--|'')
+and extends to the next newline,
+or begins with the sequence of an open brace and a dash (``\verb|{-|'')
+and ends with the sequence of a dash and a close brace (``\verb|-}|'').
+Comments of the latter kind can be nested.
+
+\subsection{Syntax}
+
+The following is the syntax for the input file after lexical analysis
+in a variation of the Backus--Naur form.
+A vertical bar (``~|~'') means a choice,
+brackets (``[\ldots]'') mean an optional part,
+and braces (``\{\ldots\}'') mean zero or more repetitions.
+\begin{align*}
+  \param{input-file} ::=\; & \{\param{statement}\} \\[0.5\baselineskip]
+%
+  \param{statement} ::=\; & \param{inputs-statement} \\
+  |\; & \param{outputs-statement} \\
+  |\; & \param{equation-statement} \\
+  |\; & \param{empty-statement} \\
+  \param{inputs-statement} ::=\; & \text{\texttt{.inputs}}\;[\param{wire-name} \; \{\text{\texttt{,}}\;\param{wire-name}\}]\;\text{\texttt{;}} \\
+  \param{outputs-statement} ::=\; & \text{\texttt{.outputs}}\;[\param{expr} \; \{\text{\texttt{,}}\;\param{expr}\}\;\text{\texttt{;}} \\
+  \param{equation-statement} ::=\; & \param{wire-name}\;\text{\texttt{=}}\;\param{expr}\;\text{\texttt{;}} \\
+  \param{empty-statement} ::=\; & \text{\texttt{;}} \\[0.5\baselineskip]
+%
+  \param{expr} ::=\; & \texttt{0} \\
+  |\; & \texttt{1} \\
+  |\; & \param{wire-name} \\
+  |\; & \text{\texttt{(}}\;\param{expr}\;\text{\texttt{)}} \\
+  |\; & \text{\texttt{\~{}}}\;\param{expr} \\
+  |\; & \param{expr}\;\text{\texttt{\&}}\;\param{expr} \\
+  |\; & \param{expr}\;\text{\texttt{\^}}\;\param{expr} \\
+  |\; & \param{expr}\;\text{\texttt{|}}\;\param{expr} \\[0.5\baselineskip]
+%
+  \param{wire-name} ::=\; & \param{identifier which is not a keyword} \\
+  \param{keyword} ::=\; & \text{\texttt{.inputs}} \;|\; \text{\texttt{.outputs}}
+\end{align*}
+
+Keywords and identifiers are case-sensitive.
+
+In the production rules for \param{expr},
+the unary operator \verb|~| has the highest precedence,
+the binary operator \verb|&| has the second highest,
+the binary operator \verb|^| has the third highest,
+and the binary operator \verb#|# has the lowest precedence.
+The associativity of the binary operators \verb|&|, \verb|^|, and \verb#|#
+does not matter because of their semantics.
+
+A valid input file must contain exactly one inputs statement
+and exactly one outputs statement.
+An input file may contain any number of equation statements and empty statements.
+Empty statements do not have any meaning and completely ignored.
+The order of equation statements does not have any meaning,
+nor does the relative order of the inputs statement, the outputs statement,
+and equation statements.
+
+\subsection{Wire definitions}
+
+All the wires that appear in expressions
+(in the outputs statement or the right-hand side of an equation statement)
+must be defined.
+
+A wire is considered to be defined if it appears in the inputs statement
+or it appears on the left-hand side of an equation statement.
+
+No wires may be defined more than once.
+
+\section{To-dos}
+
+\begin{itemize}
+\item
+  Detect unused wires in input circuits and remove them.
+\item
+  Detect wires which are guaranteed to contain the same value
+  (or the opposite values) in input circuits
+  and merge them into one.
+\item
+  Implement any nontrivial optimizations.
+\end{itemize}
+
+\section*{About license of Claq}
+
+Copyright \textcopyright\ 2013 NEC Laboratories America, Inc.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+\begin{itemize}
+\item
+  Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+\item
+  Redistributions in binary form must reproduce the above
+  copyright notice, this list of conditions and the following
+  disclaimer in the documentation and/or other materials provided
+  with the distribution.
+\item
+  Neither the name of NEC Laboratories America, Inc.\ nor the names
+  of its contributors may be used to endorse or promote products
+  derived from this software without specific prior written
+  permission.
+\end{itemize}
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES\@, INCLUDING\@, BUT NOT
+LIMITED TO\@, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED\@.  IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT\@, INDIRECT\@, INCIDENTAL\@,
+SPECIAL\@, EXEMPLARY\@, OR CONSEQUENTIAL DAMAGES (INCLUDING\@, BUT NOT
+LIMITED TO\@, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES\@; LOSS OF USE\@,
+DATA\@, OR PROFITS\@; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY\@, WHETHER IN CONTRACT\@, STRICT LIABILITY\@, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE\@, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+\section*{Acknowledgments}
+
+The author thanks Martin Roetteler for helpful discussions.
+The development of Claq was supported in part by the Quantum Computer Science Program
+of the Intelligence Advanced Research Projects Activity.
+
+\end{document}

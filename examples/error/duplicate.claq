@@ -1,0 +1,8 @@
+-- Should produce error: wire "a0" defined more than once
+.inputs a0, a1, b0, b1, c0;
+.outputs s0, s1, s2;
+a0 = b0;
+s0 = a0 ^ b0 ^ c0;
+c1 = a0 & (b0 | c0) | b0 & c0;
+s1 = a1 ^ b1 ^ c1;
+s2 = a1 & (b1 | c1) | b1 & c1;
